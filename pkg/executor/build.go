@@ -184,6 +184,9 @@ func initConfig(img partial.WithConfigFile, opts *config.KanikoOptions) (*v1.Con
 }
 
 func newLayerCache(opts *config.KanikoOptions) cache.LayerCache {
+	if opts.NoPushCache && opts.CacheDir != "" {
+		return &cache.LocalDirCache{Opts: opts}
+	}
 	if isOCILayout(opts.CacheRepo) {
 		return &cache.LayoutCache{
 			Opts: opts,
@@ -419,7 +422,7 @@ func (s *stageBuilder) build() error {
 				logrus.Debugf("Build: cache key for command %v %v", command.String(), ck)
 
 				// Push layer to cache (in parallel) now along with new config file
-				if command.ShouldCacheOutput() && !s.opts.NoPushCache {
+				if command.ShouldCacheOutput() {
 					cacheGroup.Go(func() error {
 						return s.pushLayerToCache(s.opts, ck, tarPath, command.String())
 					})

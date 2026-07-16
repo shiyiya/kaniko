@@ -127,6 +127,30 @@ func (lc *LayoutCache) RetrieveLayer(ck string) (v1.Image, error) {
 	return img, nil
 }
 
+// LocalDirCache is a local file-based layer cache stored in Opts.CacheDir.
+type LocalDirCache struct {
+	Opts *config.KanikoOptions
+}
+
+// RetrieveLayer retrieves a layer from the local cache directory given the cache key ck.
+func (lc *LocalDirCache) RetrieveLayer(ck string) (v1.Image, error) {
+	if lc.Opts.CacheDir == "" {
+		return nil, errors.New("cache-dir is not set")
+	}
+	cachePath := filepath.Join(lc.Opts.CacheDir, ck)
+	logrus.Infof("Checking for locally cached layer %s...", cachePath)
+
+	img, err := cachedImageFromPath(cachePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = verifyImage(img, lc.Opts.CacheTTL, cachePath); err != nil {
+		return nil, err
+	}
+	return img, nil
+}
+
 func locateImage(path string) (v1.Image, error) {
 	var img v1.Image
 	layoutPath, err := layout.FromPath(path)

@@ -352,6 +352,10 @@ func writeImageOutputs(image v1.Image, destRefs []name.Tag) error {
 // pushLayerToCache pushes layer (tagged with cacheKey) to opts.CacheRepo
 // if opts.CacheRepo doesn't exist, infer the cache from the given destination
 func pushLayerToCache(opts *config.KanikoOptions, cacheKey string, tarPath string, createdBy string) error {
+	if opts.NoPushCache {
+		return saveLayerToLocalCache(opts, cacheKey, tarPath, createdBy)
+	}
+
 	var layerOpts []tarball.LayerOption
 	if opts.CompressedCaching == true {
 		layerOpts = append(layerOpts, tarball.WithCompressedCaching)
@@ -408,6 +412,65 @@ func pushLayerToCache(opts *config.KanikoOptions, cacheKey string, tarPath strin
 		cacheOpts.NoPush = true
 	}
 	return DoPush(empty, &cacheOpts)
+}
+
+// saveLayerToLocalCache saves a layer tarball and its manifest to opts.CacheDir.
+func saveLayerToLocalCache(opts *config.KanikoOptions, cacheKey string, tarPath string, createdBy string) error {
+	if opts.CacheDir == "" {
+		return errors.New("cache-dir must be set when using no-push-cache")
+	}
+
+	layerOpts := []tarball.LayerOption{}
+	if opts.CompressedCaching == true {
+		layerOpts = append(layerOpts, tarball.WithCompressedCaching)
+	}
+	if opts.CompressionLevel > 0 {
+		layerOpts = append(layerOpts, tarball.WithCompressionLevel(opts.CompressionLevel))
+	}
+	switch opts.Compression {
+	case config.ZStd:
+		layerOpts = append(layerOpts, tarball.WithCompression("zstd"), tarball.WithMediaType(types.OCILayerZStd))
+	case config.GZip:
+		// layer already gzipped by default
+	}
+
+	layer, err := tarball.LayerFromFile(tarPath, layerOpts...)
+	if err != nil {
+		return err
+	}
+
+	empty := empty.Image
+	empty, err = mutate.CreatedAt(empty, v1.Time{Time: time.Now()})
+	if err != nil {
+		return errors.Wrap(err, "setting empty image created time")
+	}
+	empty, err = mutate.Append(empty, mutate.Addendum{Layer: layer, History: v1.History{Author: constants.Author, CreatedBy: createdBy}})
+	if err != nil {
+		return errors.Wrap(err, "appending layer onto empty image")
+	}
+
+	if err := os.MkdirAll(opts.CacheDir, 0755); err != nil {
+		return errors.Wrap(err, "creating cache dir")
+	}
+	cacheFilePath := filepath.Join(opts.CacheDir, cacheKey)
+	logrus.Infof("Saving layer %s to local cache %s", cacheKey, cacheFilePath)
+
+	dummyRef, err := name.NewTag("docker.io/library/cache:latest", name.WeakValidation)
+	if err != nil {
+		return errors.Wrap(err, "creating dummy cache tag")
+	}
+	if err := tarball.WriteToFile(cacheFilePath, dummyRef, empty); err != nil {
+		return errors.Wrap(err, "writing cache tarball")
+	}
+
+	mfst, err := empty.RawManifest()
+	if err != nil {
+		return errors.Wrap(err, "getting cache manifest")
+	}
+	if err := os.WriteFile(cacheFilePath+".json", mfst, 0644); err != nil {
+		return errors.Wrap(err, "writing cache manifest")
+	}
+	return nil
 }
 
 // setDummyDestinations sets the dummy destinations required to generate new
