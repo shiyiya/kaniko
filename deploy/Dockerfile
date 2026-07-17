@@ -56,7 +56,15 @@ RUN \
 
 # Generate latest ca-certificates
 FROM debian:bookworm-slim AS certs
-RUN apt update && apt install -y ca-certificates
+ENV HTTP_PROXY=http://proxy01.eng.t-head.cn:3128 \
+    HTTPS_PROXY=http://proxy01.eng.t-head.cn:3128 \
+    http_proxy=http://proxy01.eng.t-head.cn:3128 \
+    https_proxy=http://proxy01.eng.t-head.cn:3128
+RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # use musl busybox since it's staticly compiled on all platforms
 FROM busybox:musl AS busybox
@@ -72,6 +80,7 @@ ENV HOME /root
 ENV USER root
 ENV PATH /usr/local/bin:/kaniko
 ENV SSL_CERT_DIR=/kaniko/ssl/certs
+ENV DOCKER_CONFIG /kaniko/.docker/
 
 FROM kaniko-base-slim AS kaniko-base
 
