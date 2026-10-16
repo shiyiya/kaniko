@@ -56,10 +56,10 @@ RUN \
 
 # Generate latest ca-certificates
 FROM debian:bookworm-slim AS certs
-ENV HTTP_PROXY=http://proxy01.eng.t-head.cn:3128 \
-    HTTPS_PROXY=http://proxy01.eng.t-head.cn:3128 \
-    http_proxy=http://proxy01.eng.t-head.cn:3128 \
-    https_proxy=http://proxy01.eng.t-head.cn:3128
+ENV HTTP_PROXY=http://aisw_proxy:aisw_proxy1688@na131t-swdevops-proxy01.eng.t-head.cn:3128 \
+    HTTPS_PROXY=http://aisw_proxy:aisw_proxy1688@na131t-swdevops-proxy01.eng.t-head.cn:3128 \
+    http_proxy=http://aisw_proxy:aisw_proxy1688@na131t-swdevops-proxy01.eng.t-head.cn:3128 \
+    https_proxy=http://aisw_proxy:aisw_proxy1688@na131t-swdevops-proxy01.eng.t-head.cn:3128
 RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources && \
     sed -i 's|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
