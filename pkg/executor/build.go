@@ -223,7 +223,17 @@ func (s *stageBuilder) populateCompositeKey(command commands.DockerCommand, file
 	compositeKey.AddKey(command.String())
 
 	for _, f := range files {
-		if err := compositeKey.AddPath(f, s.fileContext); err != nil {
+		fc := s.fileContext
+		if cmd, ok := commands.CastAbstractCopyCommand(command); ok && cmd.From() != "" {
+			// COPY --from sources live under KanikoDir, outside the build
+			// context. .dockerignore patterns must not apply to them, otherwise
+			// their content is dropped from the cache key (the deprecated
+			// moby Matches parent-dir check matches the empty first component
+			// of absolute /kaniko paths against patterns like "*") and stale
+			// layers keep being reused forever.
+			fc = util.FileContext{Root: config.KanikoDir}
+		}
+		if err := compositeKey.AddPath(f, fc); err != nil {
 			return compositeKey, err
 		}
 	}
