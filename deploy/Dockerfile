@@ -25,9 +25,6 @@ ENV GOOS=$TARGETOS
 ENV CGO_ENABLED=0
 ENV GOBIN=/usr/local/bin
 
-# Add .docker config dir
-RUN mkdir -p /kaniko/.docker
-
 COPY . .
 
 #  dependencies https://github.com/golang/go/issues/48332
@@ -94,7 +91,11 @@ COPY --from=builder --chown=0:0 /usr/local/bin/docker-credential-gcr /kaniko/doc
 COPY --from=builder --chown=0:0 /usr/local/bin/docker-credential-ecr-login /kaniko/docker-credential-ecr-login
 COPY --from=builder --chown=0:0 /usr/local/bin/docker-credential-acr-env /kaniko/docker-credential-acr-env
 
-COPY --from=builder /kaniko/.docker /kaniko/.docker
+# NOTE: upstream copies an empty /kaniko/.docker from the builder here. When this
+# image is built by kaniko itself, /kaniko/.docker is already the pod's read-only
+# kaniko-secret mount, so writing it fails with "chown /kaniko/.docker: read-only
+# file system". The directory is empty anyway and is provided at runtime by the
+# secret mount, so it is intentionally not created in the image.
 
 ENV DOCKER_CONFIG /kaniko/.docker/
 ENV DOCKER_CREDENTIAL_GCR_CONFIG /kaniko/.config/gcloud/docker_credential_gcr_config.json
