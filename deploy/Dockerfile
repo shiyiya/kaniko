@@ -111,9 +111,13 @@ ENTRYPOINT ["/kaniko/warmer"]
 
 FROM kaniko-base AS kaniko-executor
 
-COPY --from=builder /src/out/executor /kaniko/executor
+# The executor binary cannot be installed at /kaniko/executor when this image is
+# built by kaniko: kaniko's RootDir is "/", so /kaniko/executor is the running
+# builder process itself, and writing it fails with "text file busy" (ETXTBSY).
+# Install it under a different name and point ENTRYPOINT at it.
+COPY --from=builder /src/out/executor /kaniko/kaniko-executor
 
-ENTRYPOINT ["/kaniko/executor"]
+ENTRYPOINT ["/kaniko/kaniko-executor"]
 
 FROM kaniko-executor AS kaniko-debug
 
@@ -130,6 +134,6 @@ RUN ["/busybox/ln", "-s", "/busybox/sh", "/bin/sh"]
 
 FROM kaniko-base-slim AS kaniko-slim
 
-COPY --from=builder /src/out/executor /kaniko/executor
+COPY --from=builder /src/out/executor /kaniko/kaniko-executor
 
-ENTRYPOINT ["/kaniko/executor"]
+ENTRYPOINT ["/kaniko/kaniko-executor"]
