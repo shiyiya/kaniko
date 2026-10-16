@@ -71,8 +71,13 @@ FROM busybox:musl AS busybox
 
 FROM scratch AS kaniko-base-slim
 
-# Create kaniko directory with world write permission to allow non root run
-RUN --mount=from=busybox,dst=/usr/ ["busybox", "sh", "-c", "mkdir -p /kaniko && chmod 777 /kaniko"]
+# Create kaniko directory with world write permission to allow non root run.
+# BuildKit's RUN --mount=from is not implemented by kaniko, which would run the
+# command on the bare scratch rootfs and fail with "busybox: executable file not
+# found". Copy busybox in, use it, and remove it in the same RUN so the binary
+# is whiteouted and does not persist in the image.
+COPY --from=busybox /bin/busybox /busybox
+RUN ["/busybox", "sh", "-c", "mkdir -p /kaniko && chmod 777 /kaniko && rm -f /busybox"]
 
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /kaniko/ssl/certs/
 COPY files/nsswitch.conf /etc/nsswitch.conf
